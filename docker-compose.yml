@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  glsp:
+    build: .
+    runtime: nvidia  # Enable NVIDIA runtime
+    volumes:
+      - ./config:/app/config
+      - ./checkpoints:/app/checkpoints
+      - ./images:/app/images
+      - ./output:/app/output
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./post:/app/post
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - MODEL_PATH=/app/checkpoints/model.pth
+      - CONFIG_PATH=/app/config/wireframe.yaml
+      - INPUT_DIR=/app/images
+      - OUTPUT_DIR=/app/output
+    ports:
+      - "8000:8000"  # API port
+      - "6006:6006"  # TensorBoard port
+    tty: true
+    stdin_open: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu] 
