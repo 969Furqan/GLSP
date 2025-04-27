@@ -1,47 +1,19 @@
-FROM continuumio/miniconda3
+FROM nvidia/cuda:11.3.1-runtime-ubuntu20.04
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# Install Python and dependencies
+RUN apt-get update && apt-get install -y python3 python3-pip git && \
+    ln -s /usr/bin/python3 /usr/bin/python
 
-# Set working directory
 WORKDIR /app
 
-# Create conda environment
-RUN conda create -n glsp python=3.8 -y
-SHELL ["/bin/bash", "-c"]
+COPY requirements.txt .
+RUN pip3 install --upgrade pip && pip3 install -r requirements.txt
 
-# Activate conda environment and install dependencies
-RUN echo "source activate glsp" > ~/.bashrc
-ENV PATH /opt/conda/envs/glsp/bin:$PATH
+RUN pip3 install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
 
-# Install PyTorch with CUDA
-RUN conda install -y pytorch cudatoolkit=10.1 -c pytorch
-RUN conda install -y tensorboardx -c conda-forge
 
-# Install other dependencies
-RUN conda install -y pyyaml docopt matplotlib scikit-image opencv
-RUN pip install flask flask-cors
-
-# Copy the application
 COPY . .
 
-# Make scripts executable
-RUN chmod +x run.py
-RUN chmod +x api.py
+EXPOSE 8000
 
-# Create necessary directories
-RUN mkdir -p data logs post config checkpoints images output
-
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV FLASK_APP=api.py
-ENV FLASK_ENV=production
-
-# Command to run when container starts
-ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "glsp"]
-CMD ["python", "api.py"] 
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
