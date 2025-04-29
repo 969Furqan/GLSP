@@ -1,11 +1,21 @@
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import os
 import subprocess
 import uuid
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Your Next.js app's URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 CHECKPOINT_PATH = "checkpoints/model.pth"
 CONFIG_PATH = "config/wireframe.yaml"
