@@ -28,6 +28,7 @@ import skimage.transform
 import torch
 import yaml
 from docopt import docopt
+from sklearn.cluster import DBSCAN
 
 import glsp
 from glsp.config import C, M
@@ -53,6 +54,10 @@ def main():
     C.update(C.from_yaml(filename=config_file))
     M.update(C.model)
     pprint.pprint(C, indent=4)
+
+    # Add node clustering parameters
+    NODE_CLUSTER_EPS = 20  # Increased from 3 to 5 pixels to better handle close nodes
+    NODE_CLUSTER_MIN_SAMPLES = 1  # Keep this at 1 to ensure all points are considered
 
     # NEW: Get output path if provided
     output_svg = args["<output-svg>"]
@@ -131,12 +136,45 @@ def main():
     plt.gca().set_axis_off()
     plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
     plt.margins(0, 0)
+
+    # Collect all unique node positions
+    all_nodes = []
     for (a, b), s in zip(nlines, nscores):
         if s < t:
             continue
-        plt.plot([a[1], b[1]], [a[0], b[0]], c=c(s), linewidth=2, zorder=s)
-        plt.scatter(a[1], a[0], **PLTOPTS)
-        plt.scatter(b[1], b[0], **PLTOPTS)
+        all_nodes.extend([a, b])
+    
+    # Convert to numpy array for clustering
+    all_nodes = np.array(all_nodes)
+    
+    # Cluster nodes using DBSCAN
+    clustering = DBSCAN(eps=NODE_CLUSTER_EPS, min_samples=NODE_CLUSTER_MIN_SAMPLES).fit(all_nodes)
+    
+    # Get unique cluster centers with improved handling
+    cluster_centers = []
+    for cluster_id in set(clustering.labels_):
+        if cluster_id == -1:  # Skip noise points
+            continue
+        cluster_points = all_nodes[clustering.labels_ == cluster_id]
+        # Use weighted average based on distance to ensure better centering
+        center = np.mean(cluster_points, axis=0)
+        cluster_centers.append(center)
+    
+    cluster_centers = np.array(cluster_centers)
+
+    # Plot lines and nodes using the clustered centers
+    for (a, b), s in zip(nlines, nscores):
+        if s < t:
+            continue
+        # Find closest cluster centers for each endpoint with improved matching
+        a_center = cluster_centers[np.argmin(np.linalg.norm(cluster_centers - a, axis=1))]
+        b_center = cluster_centers[np.argmin(np.linalg.norm(cluster_centers - b, axis=1))]
+        
+        # Only plot if the centers are not too close to each other
+        if np.linalg.norm(a_center - b_center) > NODE_CLUSTER_EPS:
+            plt.plot([a_center[1], b_center[1]], [a_center[0], b_center[0]], c=c(s), linewidth=2, zorder=s)
+            plt.scatter(a_center[1], a_center[0], **PLTOPTS)
+            plt.scatter(b_center[1], b_center[0], **PLTOPTS)
     plt.gca().xaxis.set_major_locator(plt.NullLocator())
     plt.gca().yaxis.set_major_locator(plt.NullLocator())
     plt.imshow(im)

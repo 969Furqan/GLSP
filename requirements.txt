@@ -6,4 +6,5 @@ docopt
 matplotlib
 scikit-image
 opencv-python
+scikit-learn
 python-multipart
